@@ -39,6 +39,11 @@ class PDFProcessor:
             try:
                 loader = PyPDFLoader(pdf_path)
                 documents = loader.load()
+
+                # PostgreSQL 호환성: NULL 문자 제거
+                for doc in documents:
+                    doc.page_content = doc.page_content.replace('\x00', '')
+
                 all_documents.extend(documents)
                 loaded_files.append(os.path.basename(pdf_path))
                 print(f"✓ Loaded: {os.path.basename(pdf_path)} ({len(documents)} pages)")

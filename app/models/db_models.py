@@ -1,7 +1,8 @@
 # app/models/db_models.py
-from sqlalchemy import Column, String, DateTime
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy import Column, String, DateTime, Text
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.types import TypeDecorator, CHAR
+from pgvector.sqlalchemy import Vector
 from datetime import datetime, timezone
 import uuid
 from app.database import Base
@@ -52,5 +53,25 @@ class User(Base):
             "user_id": str(self.user_id),
             "email": self.email,
             "nickname": self.nickname,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
+
+class DocumentEmbedding(Base):
+    """문서 임베딩 모델 - pgvector를 사용한 벡터 검색"""
+    __tablename__ = "document_embeddings"
+
+    id = Column(UUID(), primary_key=True, default=uuid.uuid4, index=True)
+    content = Column(Text, nullable=False)  # 문서 내용
+    embedding = Column(Vector(1536), nullable=False)  # OpenAI text-embedding-3-small 차원
+    doc_metadata = Column(JSONB, default=dict)  # 메타데이터 (파일명, 페이지 번호 등)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    def to_dict(self):
+        """모델을 딕셔너리로 변환"""
+        return {
+            "id": str(self.id),
+            "content": self.content,
+            "doc_metadata": self.doc_metadata,
             "created_at": self.created_at.isoformat() if self.created_at else None
         }

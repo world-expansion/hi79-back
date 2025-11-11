@@ -43,13 +43,20 @@ async def initialize_chatbot():
     global vector_store_service
 
     try:
-        # 1. OpenAI API 키 확인
+        # 1. 설정 확인
         settings = get_settings()
         openai_api_key = settings.openai_api_key
         if not openai_api_key:
             raise HTTPException(
                 status_code=500,
                 detail="OPENAI_API_KEY가 설정되지 않았습니다."
+            )
+
+        database_url = settings.database_url
+        if not database_url:
+            raise HTTPException(
+                status_code=500,
+                detail="DATABASE_URL이 설정되지 않았습니다."
             )
 
         # 2. data 디렉토리 설정
@@ -62,7 +69,10 @@ async def initialize_chatbot():
             )
 
         # 3. 벡터 스토어 서비스 생성
-        vector_store_service = VectorStoreService(openai_api_key=openai_api_key)
+        vector_store_service = VectorStoreService(
+            openai_api_key=openai_api_key,
+            database_url=database_url
+        )
 
         # 4. 기존 벡터 DB가 있으면 로드
         if vector_store_service.load_vectorstore():
