@@ -1,12 +1,15 @@
 # routers/chat.py
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from app.schemas.chat import (
     SessionCreateRequest,
     SessionCreateResponse,
     ChatMessageRequest,
     ChatMessageResponse,
     SessionEndRequest,
-    SessionEndResponse
+    SessionEndResponse,
+    WeeklyDiariesResponse,
+    WeeklyDiariesData,
+    DiaryEntry
 )
 from app.services.chat_session import get_session_manager, ChatSessionManager
 from app.services.diary_service import get_diary_service, DiaryService
@@ -177,3 +180,62 @@ async def end_session(
     except Exception as e:
         print(f"세션 종료 실패: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"세션 종료 실패: {str(e)}")
+
+
+@router.get("/diaries/weekly", response_model=WeeklyDiariesResponse, summary="일주일치 일기 조회")
+async def get_weekly_diaries(
+    days: int = Query(
+        default=7,
+        ge=1,
+        le=30,
+        description="조회할 일수 (1일 이상 30일 이하, 기본값: 7일)"
+    ),
+    user_id: str = Depends(get_current_user_id),
+    diary_service: DiaryService = Depends(get_diary_service)
+):
+    """
+    일주일치 일기 조회 (최근 N일)
+
+    **파라미터:**
+    - days: 조회할 일수 (기본 7일, 최대 30일)
+
+    **응답:**
+    - diaries: 일기 리스트 (날짜순 정렬, 최신순)
+    - count: 일기 개수
+    """
+    try:
+        # 일수 제한 (최대 30일)
+        if days < 1 or days > 30:
+            raise HTTPException(status_code=400, detail="일수는 1일 이상 30일 이하여야 합니다.")
+
+        # 일주일치 일기 조회
+        diaries_dict = diary_service.get_weekly_diaries(
+            user_id=user_id,
+            days=days
+        )
+
+        # 딕셔너리 리스트를 DiaryEntry 객체 리스트로 변환
+        diaries = [
+            DiaryEntry(
+                content=diary["content"],
+                metadata=diary["metadata"],
+                created_at=diary["created_at"]
+            )
+            for diary in diaries_dict
+        ]
+
+        return WeeklyDiariesResponse(
+            success=True,
+            message=f"최근 {days}일치 일기를 조회했습니다.",
+            data=WeeklyDiariesData(
+                diaries=diaries,
+                count=len(diaries),
+                days=days
+            )
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"일기 조회 실패: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"일기 조회 실패: {str(e)}")

@@ -1,6 +1,6 @@
 # services/diary_service.py
 from typing import List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from langchain_postgres import PGVector
 from langchain_openai import OpenAIEmbeddings
 from langchain_core.documents import Document
@@ -147,6 +147,76 @@ class DiaryService:
 
         except:
             return 0
+
+    def get_weekly_diaries(
+        self,
+        user_id: str,
+        days: int = 7
+    ) -> List[Dict]:
+        """
+        일주일치 일기 조회 (최근 N일)
+
+        Args:
+            user_id: 사용자 ID
+            days: 조회할 일수 (기본 7일)
+
+        Returns:
+            일기 리스트 (content + metadata), 날짜순 정렬 (최신순)
+        """
+        try:
+            vectorstore = PGVector(
+                collection_name=self.collection_name,
+                connection=self.database_url,
+                embeddings=self.embeddings
+            )
+
+            # user_id로 필터링하여 모든 일기 검색
+            results = vectorstore.similarity_search(
+                "",  # 빈 쿼리
+                k=1000,  # 충분히 큰 수
+                filter={"user_id": user_id}
+            )
+
+            # 날짜 범위 계산 (현재 시간 기준)
+            now = datetime.now()
+            cutoff_date = now - timedelta(days=days)
+
+            # 날짜 필터링 및 포맷팅
+            weekly_diaries = []
+            for doc in results:
+                metadata = doc.metadata
+                created_at_str = metadata.get("created_at")
+
+                if created_at_str:
+                    try:
+                        # ISO 형식 문자열을 datetime으로 변환
+                        created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+                        # 타임존 정보 제거 후 비교
+                        created_at_naive = created_at.replace(tzinfo=None)
+
+                        # 최근 N일 이내인지 확인
+                        if created_at_naive >= cutoff_date:
+                            weekly_diaries.append({
+                                "content": doc.page_content,
+                                "metadata": metadata,
+                                "created_at": created_at_str
+                            })
+                    except (ValueError, AttributeError) as e:
+                        # 날짜 파싱 실패 시 로그만 남기고 건너뛰기
+                        print(f"날짜 파싱 실패: {created_at_str}, 오류: {e}")
+                        continue
+
+            # 날짜순 정렬 (최신순)
+            weekly_diaries.sort(
+                key=lambda x: x.get("created_at", ""),
+                reverse=True
+            )
+
+            return weekly_diaries
+
+        except Exception as e:
+            print(f"일주일치 일기 조회 실패: {e}")
+            return []
 
 
 # 전역 일기 서비스 인스턴스

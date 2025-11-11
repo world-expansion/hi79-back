@@ -32,3 +32,21 @@ class SessionEndResponse(BaseModel):
     success: bool
     message: str
     data: dict  # diary_id, diary_content 등
+
+class DiaryEntry(BaseModel):
+    """일기 항목"""
+    content: str = Field(..., description="일기 내용")
+    metadata: dict = Field(..., description="일기 메타데이터")
+    created_at: str = Field(..., description="생성 일시 (ISO 형식)")
+
+class WeeklyDiariesData(BaseModel):
+    """일주일치 일기 조회 데이터"""
+    diaries: List[DiaryEntry] = Field(..., description="일기 리스트 (날짜순 정렬, 최신순)")
+    count: int = Field(..., description="일기 개수")
+    days: int = Field(..., description="조회한 일수")
+
+class WeeklyDiariesResponse(BaseModel):
+    """일주일치 일기 조회 응답"""
+    success: bool = Field(..., description="성공 여부")
+    message: str = Field(..., description="응답 메시지")
+    data: WeeklyDiariesData = Field(..., description="일기 조회 데이터")
