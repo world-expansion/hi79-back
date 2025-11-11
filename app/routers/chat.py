@@ -143,18 +143,19 @@ async def end_session(
             raise HTTPException(status_code=403, detail="세션 접근 권한이 없습니다.")
 
         # 대화 요약 → 일기 생성
-        diary_content = orchestrator.summarize_conversation_to_diary(request.session_id)
+        diary_result = orchestrator.summarize_conversation_to_diary(request.session_id)
 
-        if not diary_content:
+        if not diary_result or not diary_result.get("diary_text"):
             raise HTTPException(status_code=400, detail="대화 내용이 없어 일기를 생성할 수 없습니다.")
 
         # 일기 저장 (Vector DB)
         diary_id = diary_service.save_diary(
             user_id=user_id,
-            diary_content=diary_content,
+            diary_content=diary_result["diary_text"],
             metadata={
                 "session_id": request.session_id,
-                "message_count": session_info.get("message_count", 0)
+                "message_count": session_info.get("message_count", 0),
+                "alternative_perspective": diary_result.get("alternative_perspective", "")
             }
         )
 
@@ -167,7 +168,8 @@ async def end_session(
             message="세션이 종료되고 일기가 생성되었습니다.",
             data={
                 "diary_id": diary_id,
-                "diary_content": diary_content,
+                "diary_content": diary_result["diary_text"],
+                "alternative_perspective": diary_result.get("alternative_perspective", ""),
                 "message_count": session_info.get("message_count", 0)
             }
         )
