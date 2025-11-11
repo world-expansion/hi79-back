@@ -37,7 +37,7 @@ class ChatSessionManager:
         Returns:
             session_id: 생성된 세션 ID
         """
-        session_id = str(uuid.uuid4())
+        session_id = user_id
         session_key = f"session:{session_id}"
 
         session_data = {
