@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     openai_api_key: Optional[str] = None
+    database_url: str  # 필수 환경변수
 
     class Config:
         env_file = ".env"
