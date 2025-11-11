@@ -1,9 +1,8 @@
 # services/chat_session.py
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import json
 import uuid
-import hashlib
 import redis
 from app.config import get_settings
 
@@ -33,35 +32,18 @@ class ChatSessionManager:
 
     def create_session(self, user_id: str) -> str:
         """
-        새 세션 생성 (멱등성 보장: user_id + 날짜 기반)
-
-        같은 사용자가 같은 날짜에 여러 번 호출해도 동일한 session_id 반환
+        새 세션 생성
 
         Returns:
-            session_id: 생성된 또는 기존 세션 ID
+            session_id: 생성된 세션 ID
         """
-        # 현재 날짜 (KST 기준)
-        now = datetime.now(timezone.utc) + timedelta(hours=9)  # UTC+9 (한국 시간)
-        date_str = now.strftime("%Y-%m-%d")
-
-        # user_id + 날짜 기반 결정적 세션 ID 생성 (UUID5 사용)
-        namespace = uuid.UUID('6ba7b810-9dad-11d1-80b4-00c04fd430c8')  # DNS namespace
-        session_id = str(uuid.uuid5(namespace, f"{user_id}:{date_str}"))
-
+        session_id = str(uuid.uuid4())
         session_key = f"session:{session_id}"
 
-        # 이미 존재하는 세션이면 TTL만 갱신 후 반환 (멱등성)
-        if self.redis.exists(session_key):
-            self.redis.expire(session_key, self.session_ttl)
-            self.redis.expire(f"messages:{session_id}", self.session_ttl)
-            return session_id
-
-        # 새 세션 생성
         session_data = {
             "user_id": user_id,
-            "date": date_str,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "last_activity": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now().isoformat(),
+            "last_activity": datetime.now().isoformat(),
             "message_count": 0
         }
 
@@ -74,36 +56,7 @@ class ChatSessionManager:
         self.redis.delete(messages_key)  # 혹시 모를 기존 데이터 삭제
         self.redis.expire(messages_key, self.session_ttl)
 
-        # 사용자별 날짜별 인덱스 추가 (조회용)
-        user_session_key = f"user_session:{user_id}:{date_str}"
-        self.redis.set(user_session_key, session_id, ex=self.session_ttl)
-
         return session_id
-
-    def get_or_create_session(self, user_id: str, date_str: Optional[str] = None) -> str:
-        """
-        특정 날짜의 세션 조회 또는 생성
-
-        Args:
-            user_id: 사용자 ID
-            date_str: 날짜 문자열 (YYYY-MM-DD). None이면 오늘 날짜 사용
-
-        Returns:
-            session_id
-        """
-        if date_str is None:
-            now = datetime.now(timezone.utc) + timedelta(hours=9)
-            date_str = now.strftime("%Y-%m-%d")
-
-        # 인덱스로 먼저 조회
-        user_session_key = f"user_session:{user_id}:{date_str}"
-        session_id = self.redis.get(user_session_key)
-
-        if session_id:
-            return session_id
-
-        # 없으면 생성 (create_session이 멱등성 보장)
-        return self.create_session(user_id)
 
     def add_message(self, session_id: str, role: str, content: str) -> bool:
         """
@@ -127,7 +80,7 @@ class ChatSessionManager:
         message = {
             "role": role,
             "content": content,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now().isoformat()
         }
 
         # 메시지 리스트에 추가 (RPUSH: 오른쪽에 추가)
@@ -135,7 +88,7 @@ class ChatSessionManager:
         self.redis.rpush(messages_key, json.dumps(message))
 
         # 세션 메타데이터 업데이트
-        self.redis.hset(session_key, "last_activity", datetime.now(timezone.utc).isoformat())
+        self.redis.hset(session_key, "last_activity", datetime.now().isoformat())
         self.redis.hincrby(session_key, "message_count", 1)
 
         # TTL 갱신 (활동 시 30분 연장)
@@ -216,12 +169,12 @@ class ChatSessionManager:
         self.redis.expire(f"session:{session_id}", ttl)
         self.redis.expire(f"messages:{session_id}", ttl)
 
-    def delete_session(self, session_id: str):
-        """
-        세션 즉시 삭제 (수동 종료 시)
-        """
-        self.redis.delete(f"session:{session_id}")
-        self.redis.delete(f"messages:{session_id}")
+    # def delete_session(self, session_id: str):
+    #     """
+    #     세션 즉시 삭제 (수동 종료 시)
+    #     """
+    #     self.redis.delete(f"session:{session_id}")
+    #     self.redis.delete(f"messages:{session_id}")
 
     def session_exists(self, session_id: str) -> bool:
         """
