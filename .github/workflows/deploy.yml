@@ -1,24 +1,21 @@
-name: 🚀 CI/CD 파이프라인 - EC2 자동 배포
+name: 🚀 CI/CD 파이프라인 - FastAPI EC2 자동 배포
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 env:
   AWS_REGION: ap-northeast-2
   ECR_REPOSITORY: image_hub
+  IMAGE_NAME: hf-back-fastapi
   IMAGE_TAG: ${{ github.sha }}
-  IMAGE_LATEST: latest
 
 jobs:
   build_and_push:
-    name: 📦 Github Repository → ECR 이미지 빌드 & 푸시
+    name: 📦 Github → ECR 이미지 빌드 & 푸시
     runs-on: ubuntu-latest
+
     steps:
       - name: 🧩 코드 불러오기
         uses: actions/checkout@v4
@@ -26,7 +23,7 @@ jobs:
       - name: 🐳 Docker Buildx 설정
         uses: docker/setup-buildx-action@v3
 
-      - name: 🔐 AWS 로그인
+      - name: 🔐 AWS 자격 증명 설정
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -37,25 +34,23 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: 🏗️ Docker 이미지 빌드 & 푸시 (캐시 사용)
+      - name: 🏗️ Docker 이미지 빌드 & 푸시
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_LATEST }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   deploy_ec2:
-    name: 🌐 EC2 서버에 Docker Compose 배포
+    name: 🚀 EC2에 FastAPI 앱 실행
     runs-on: ubuntu-latest
     needs: build_and_push
+
     steps:
-      - name: 🧩 코드 불러오기
-        uses: actions/checkout@v4
-        
       - name: 🔌 EC2 접속 & 배포 실행
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -65,31 +60,39 @@ jobs:
           script_stop: true
           script: |
             set -e
-            echo "===== 🧩 EC2 디버그 모드 시작 ====="
-            echo "EC2 사용자: $(whoami)"
-            docker --version || echo "❌ Docker 미설치"
-            aws --version || echo "❌ AWS CLI 미설치"
-            echo "AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}"
-            echo "===== ✅ 사전 체크 완료 ====="
 
-            echo "🔁 최신 Docker 이미지 Pull 중..."
+            AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
+            ECR=${AWS_ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+            IMAGE=${ECR}/${{ env.ECR_REPOSITORY }}:latest
+
+            echo "🔐 ECR 로그인"
             aws ecr get-login-password --region ${{ env.AWS_REGION }} \
-              | docker login --username AWS --password-stdin \
-                ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+              | docker login --username AWS --password-stdin $ECR
 
-            docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_LATEST }}
+            echo "🛑 기존 컨테이너 중지/삭제"
+            docker stop ${{ env.IMAGE_NAME }} || true
+            docker rm ${{ env.IMAGE_NAME }} || true
 
-            echo "✅ Pull 완료, Compose 실행 중..."
-            cd /home/${{ secrets.EC2_USERNAME }}/apps/hf-back
-            docker compose pull
+            echo "🧹 오래된 이미지 정리"
+            docker image prune -af || true
 
-            # .env 생성 (heredoc 대신 printf: 린터/들여쓰기 안전)
+            echo "📥 최신 이미지 Pull"
+            docker pull $IMAGE
+
+            echo "🧾 환경변수 파일 작성"
             printf '%s\n' \
               'APP_NAME=FastAPI Application' \
               'DEBUG=True' \
               'HOST=0.0.0.0' \
               'PORT=8000' \
-              "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" > .env
+              "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" \
+              > .env
 
-            docker compose up -d
-            echo "✅ 배포 완료!"
+            echo "🚀 새 컨테이너 실행"
+            docker run -d \
+              --name ${{ env.IMAGE_NAME }} \
+              --env-file .env \
+              -p 8000:8000 \
+              $IMAGE
+
+            echo "✅ FastAPI 배포 완료!"
