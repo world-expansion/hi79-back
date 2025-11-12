@@ -53,6 +53,9 @@ class DiaryService:
         else:
             diary_date = now.strftime("%Y-%m-%d")
 
+        # 같은 날짜의 기존 일기 삭제
+        self._delete_diary_by_date(user_id, diary_date)
+
         # 메타데이터 구성 (필수 필드만)
         doc_metadata = {
             "user_id": user_id,
@@ -79,6 +82,49 @@ class DiaryService:
         )
 
         return diary_id
+
+    def _delete_diary_by_date(self, user_id: str, diary_date: str) -> None:
+        """
+        특정 날짜의 기존 일기 삭제 (내부 헬퍼 메서드)
+
+        Args:
+            user_id: 사용자 ID
+            diary_date: 일기 날짜 (YYYY-MM-DD)
+        """
+        try:
+            from sqlalchemy import create_engine, text
+
+            engine = create_engine(self.database_url)
+            with engine.connect() as conn:
+                # collection_id 조회
+                result = conn.execute(text("""
+                    SELECT uuid FROM langchain_pg_collection WHERE name = :collection_name LIMIT 1
+                """), {"collection_name": self.collection_name})
+                collection_row = result.fetchone()
+
+                if not collection_row:
+                    return  # collection이 없으면 삭제할 일기도 없음
+
+                collection_id = collection_row[0]
+
+                # 같은 날짜의 기존 일기 삭제
+                delete_query = text("""
+                    DELETE FROM langchain_pg_embedding
+                    WHERE collection_id = :collection_id
+                      AND cmetadata->>'user_id' = :user_id
+                      AND cmetadata->>'diary_date' = :diary_date
+                """)
+
+                conn.execute(delete_query, {
+                    "collection_id": collection_id,
+                    "user_id": str(user_id),
+                    "diary_date": diary_date
+                })
+                conn.commit()
+
+        except Exception as e:
+            print(f"기존 일기 삭제 실패 (무시하고 계속 진행): {e}")
+            # 삭제 실패해도 새 일기는 저장되어야 하므로 예외를 발생시키지 않음
 
     def search_similar_diaries(
         self,
