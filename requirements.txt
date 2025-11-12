@@ -34,3 +34,6 @@ alembic>=1.13.0
 # Redis (Session & Cache)
 redis>=5.0.0
 
+# 스케줄링
+apscheduler>=3.10.4
+
