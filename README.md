@@ -1,72 +1,205 @@
-# 우울감을 갖는 분들을 위한 회복 지원 챗봇 API
+# 👫 칭구야(Chingoo-ya)
 
-우울감을 갖는 분들을 위한 회복 지원 RAG 기반 챗봇 API
+**CBT·행동활성화 기반 감정 회복 지원 RAG 챗봇(API + 서비스)**
 
-## 설치 방법
+> “당신의 감정을 이해하고, 다시 살아갈 힘을 주는 AI 친구”
+> 
+
+📌 **2025 새싹 해커톤(SeSAC Hackathon) 출품작**
+
+📌 **팀명: 세계확장**
+
+📌 **구성원: 정수미 · 이재훈 · 이동호 · 조영진 · 김지운**
+
+---
+
+# 📖 프로젝트 개요
+
+- *칭구야(Chingoo-ya)**는
+
+우울감·고립감을 느끼는 청년들이 스스로 감정을 이해하고 회복 행동을 수행하도록 돕는
+
+**CBT 기반 감정 회복 AI 챗봇**이다.
+
+서비스는 다음 두 가지 핵심 개입(Evidence-Based Intervention)을 중심으로 구성된다:
+
+### 🔹 1. **과거 일기 기반 RAG**
+
+- 사용자 과거 감정·행동 기록을 벡터DB(pgvector)에서 검색
+- “비슷한 감정을 느꼈던 순간”을 찾아 비교
+- 감정 패턴을 재해석할 수 있도록 도움
+    
+    [세계확장] 칭구야
+    
+
+### 🔹 2. **CBT·행동활성화 매뉴얼 기반 RAG**
+
+- 치료 논문·심리학 매뉴얼을 기반으로
+    
+    사고 재구성 / 행동 활성화 / 자기자비 훈련 과제를 추천
+    
+    [세계확장] 칭구야
+    
+
+이 두 가지 RAG를 기반으로
+
+단순 공감 챗봇을 넘어 **실제 심리치료 원리를 적용한 개입형 챗봇**을 제공한다.
+
+---
+
+# 🎯 서비스 목표
+
+### ✔ 청년 우울·고립감 완화
+
+### ✔ 전문가 상담 접근성 부족 문제 해결
+
+### ✔ 감정 분석 & 행동 제안 기반 실질적 회복 촉진
+
+### ✔ 감정 패턴 기록 및 시각화를 통한 자기 이해
+
+### ✔ CBT 기반 과제 추천
+
+---
+
+# 🌟 주요 기능
+
+## 1) **CBT 기반 감정 대화 구조**
+
+- 공감 (Emotional Reflection)
+- 사고 탐색 (Cognitive Exploration)
+- 감정 명확화 (Labeling)
+- 행동 제안 (Behavioral Suggestion)
+- 인지 왜곡 자동 탐지
+    
+    (흑백논리, 과일반화, 개인화, 파국화 등)
+    
+    [세계확장] 칭구야
+    
+
+## 2) **근거 기반 개입 (Evidence-based Intervention, EBI)**
+
+### 🟦 a. 논문 기반 CBT / 행동활성화 과제 RAG
+
+- 챗봇 내에 CBT  메뉴얼 기반 대화 유도
+- 모델을 통해 나온 감정 기반으로 메뉴얼에 따라 과제 추천
+
+### 🟨 b. 과거 일기 기반 RAG
+
+- 사용자 개인 감정 기록에서 유사한 경험 검색
+- “그때 무엇을 했는지” 비교 → 회복 전략 안내
+- 감정 패턴 인식 & 자각 증진
+
+## 3) 감정 변화 기록/시각화
+
+- 일/주/월 단위 감정 그래프
+- 감정 비율 파이차트
+
+---
+
+# 🧠 시스템 구조
+
+```
+사용자 입력(대화 전체)
+      ↓
+감정 분석 모델 (BERT/RoBERTa)
+      ↓
+인지 왜곡 탐지
+      ↓
+[RAG] 과거 일기 검색 (pgvector)
+[RAG] CBT 논문 기반 검색
+      ↓
+GPT-4.1이 CBT 대화 생성
+      ↓
+[RAG] 행동 활성화 과제 추천
+      ↓
+감정 일기 자동 저장 → 그래프 생성
+
+```
+
+---
+
+# 🧩 기술 스택
+
+### Backend(API)
+
+- **FastAPI**
+- **PostgreSQL + pgvector**
+- **LangChain RAG Pipeline**
+- **OpenAI GPT-4o-mini**
+
+### NLP & ML
+
+- **text-embedding-3-small**
+- **감정 라벨링 BERT 모델**
+
+---
+
+# 📦 백엔드 API 설명 (RAG 챗봇 API)
+
+## 🚀 설치 방법
 
 ```bash
-# 가상환경 생성
 python -m venv venv
+source venv/bin/activate  # mac/Linux
+# venv\Scripts\activate   # Windows
 
-# 가상환경 활성화 (macOS/Linux)
-source venv/bin/activate
-
-# 가상환경 활성화 (Windows)
-# venv\Scripts\activate
-
-# 의존성 설치
 pip install -r requirements.txt
+
 ```
 
-## 환경 설정
+---
+
+## ⚙ 환경 설정
 
 ```bash
-# .env 파일 생성
 cp .env.example .env
+# OPENAI_API_KEY=your_api_key_here 입력
 
-# .env 파일에 OpenAI API 키 입력
-# OPENAI_API_KEY=your_api_key_here
 ```
 
-## PDF 파일 준비
+---
 
-학습할 PDF 파일들을 `data/` 폴더에 배치하세요.
+## 📚 PDF 학습 데이터 준비
+
+`data/` 폴더에 PDF 파일들을 넣으면,
+
+초기화 시 자동 학습(RAG 벡터 스토어 생성)된다.
 
 ```bash
-# data 폴더 생성 (없는 경우)
 mkdir -p data
+cp ~/Downloads/*.pdf data/
 
-# PDF 파일 복사 (예시)
-cp ~/Downloads/support_guide.pdf data/
-cp ~/Downloads/program_info.pdf data/
 ```
 
-**주의**: 초기화 시 `data/` 폴더의 **모든 PDF 파일**이 자동으로 로드됩니다.
+---
 
-## 실행 방법
+# ▶ 서버 실행
 
 ```bash
-# 서버 실행
 python run.py
+
 ```
 
-또는
+또는:
 
 ```bash
 uvicorn app.main:app --reload
+
 ```
 
-## API 사용법
+---
 
-### 1. 챗봇 초기화 (필수)
+# 💬 API 사용법
 
-서버 시작 후 가장 먼저 챗봇을 초기화해야 합니다. `data/` 폴더의 모든 PDF가 자동으로 로드됩니다.
+## 1) 챗봇 초기화
 
 ```bash
 curl -X POST http://localhost:8000/api/chatbot/initialize
+
 ```
 
-응답 예시:
+예시 응답:
+
 ```json
 {
   "success": true,
@@ -77,128 +210,94 @@ curl -X POST http://localhost:8000/api/chatbot/initialize
     "loaded_files": ["support_guide.pdf", "program_info.pdf"]
   }
 }
+
 ```
 
-### 2. 챗봇 상태 확인
+---
+
+## 2) 챗봇 상태 확인
 
 ```bash
 curl http://localhost:8000/api/chatbot/status
+
 ```
 
-### 3. 질문하기
+---
+
+## 3) 질문하기
 
 ```bash
 curl -X POST http://localhost:8000/api/chatbot/chat \
   -H "Content-Type: application/json" \
-  -d '{"question": "우울감을 해소하기 위한 프로그램에는 어떤 것들이 있나요?"}'
+  -d '{"question": "우울감을 해소하기 위한 지원 프로그램에는 어떤 것들이 있나요?"}'
+
 ```
 
-예쁘게 출력 (jq 사용):
-```bash
-curl -X POST http://localhost:8000/api/chatbot/chat \
-  -H "Content-Type: application/json" \
-  -d '{"question": "우울감을 해소하기 위한 지원 프로그램에는 어떤 것들이 있나요?"}' | jq
-```
+---
 
-응답 예시:
-```json
-{
-  "success": true,
-  "message": "답변이 생성되었습니다.",
-  "data": {
-    "question": "우울감을 해소하기 위한 지원 프로그램에는 어떤 것들이 있나요?",
-    "answer": "우울감을 해소하기 위한 사회복귀 지원 프로그램은...",
-    "sources": ["지원 프로그램 안내...", "상담 서비스 정보..."]
-  }
-}
-```
+# 📘 API 엔드포인트 요약
 
-## API 엔드포인트
+| 기능 | 메서드/URL | 설명 |
+| --- | --- | --- |
+| Health | `GET /api/health` | 서버 상태 확인 |
+| 초기화 | `POST /api/chatbot/initialize` | PDF 불러와 RAG DB 생성 |
+| 상태조회 | `GET /api/chatbot/status` | 벡터DB/모델 초기화 여부 확인 |
+| 질문 | `POST /api/chatbot/chat` | RAG 기반 상담 답변 생성 |
 
-### Health Check
-- `GET /api/health` - 서버 상태 확인
+---
 
-### Chatbot
-- `POST /api/chatbot/initialize` - 챗봇 초기화 (data/ 폴더의 모든 PDF를 자동 로드하여 벡터 스토어 생성)
-- `GET /api/chatbot/status` - 챗봇 초기화 상태 확인
-- `POST /api/chatbot/chat` - 질문하기 (RAG 기반 답변 생성)
+# 📑 API 문서
 
-## API 문서
+- Swagger: [**http://localhost:8000/docs**](http://localhost:8000/docs)
+- ReDoc: [**http://localhost:8000/redoc**](http://localhost:8000/redoc)
 
-서버 실행 후 다음 주소에서 API 문서를 확인할 수 있습니다:
+---
 
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-
-## 프로젝트 구조
+# 📁 프로젝트 구조
 
 ```
 h-sw-h-back/
 ├── app/
-│   ├── main.py              # FastAPI 애플리케이션
-│   ├── config.py            # 설정
-│   ├── routers/             # API 라우터
-│   │   ├── health.py        # 헬스체크 엔드포인트
-│   │   └── chatbot.py       # 챗봇 엔드포인트 (초기화, 대화, 상태)
-│   ├── services/            # 비즈니스 로직
-│   │   └── vector_store.py  # RAG 벡터 스토어 서비스
-│   ├── utils/               # 유틸리티
-│   │   └── pdf_loader.py    # PDF 로드 및 청크 분할
-│   └── schemas/             # Pydantic 스키마
-│       └── chatbot.py       # 요청/응답 스키마
-├── data/                    # 학습할 PDF 파일들
-│   ├── support_guide.pdf    # (예시) 지원 가이드
-│   └── program_info.pdf     # (예시) 프로그램 정보
-├── chroma_db/               # 벡터 스토어 (자동 생성됨)
-├── .env                     # 환경 변수 (gitignore)
-├── .env.example             # 환경 변수 템플릿
-├── .gitignore
-├── requirements.txt         # Python 의존성
-├── run.py                   # 서버 실행 스크립트
+│   ├── main.py
+│   ├── config.py
+│   ├── routers/
+│   │   ├── health.py
+│   │   └── chatbot.py
+│   ├── services/
+│   │   └── vector_store.py
+│   ├── utils/
+│   │   └── pdf_loader.py
+│   └── schemas/
+│       └── chatbot.py
+├── data/
+├── chroma_db/
+├── .env
+├── .env.example
+├── requirements.txt
+├── run.py
 └── README.md
+
 ```
 
-## 기술 스택
+---
 
-- **FastAPI** 0.115.0: 웹 프레임워크
-- **LangChain** 1.0.3: RAG 파이프라인 구현
-- **OpenAI API**:
-  - `gpt-4o-mini`: 답변 생성
-  - `text-embedding-3-small`: 텍스트 임베딩
-- **ChromaDB** 0.6.3: 벡터 스토어
-- **PyPDF** 3.17.4: PDF 문서 파싱
+# 🔄 작동 원리 (RAG Pipeline)
 
-## 작동 원리 (RAG Pipeline)
+1. PDF 로드
+2. 텍스트 청크 분할 (500자 / overlap 100자)
+3. OpenAI 임베딩 생성
+4. postgreDB 저장
+5. 질문 → 벡터 검색 (Top-k)
+6. GPT-4o-mini가 CBT 스타일 답변 생성
 
-1. **문서 로드**: `data/` 폴더의 모든 PDF 파일 로드
-2. **청크 분할**: 문서를 500자 단위로 분할 (100자 overlap)
-3. **임베딩 생성**: OpenAI `text-embedding-3-small`로 각 청크를 벡터화
-4. **배치 저장**: 100개씩 배치 단위로 ChromaDB에 저장 (토큰 제한 방지)
-5. **질의 처리**:
-   - 사용자 질문을 임베딩으로 변환
-   - 유사도가 높은 상위 3개 청크 검색
-   - `gpt-4o-mini`로 컨텍스트 기반 답변 생성
-6. **답변 반환**: 답변 + 참조 문서 출처 반환
+---
 
-## 주요 특징
+# ✨ 기대효과
 
-- **다중 PDF 지원**: data 폴더의 모든 PDF를 자동으로 학습
-- **배치 처리**: 대용량 문서도 안정적으로 처리
-- **통일된 응답 형식**: 모든 API가 일관된 JSON 구조 반환
-- **친절한 한국어**: 사용자 친화적인 답변 생성
-- **출처 제공**: 답변의 근거가 된 문서 청크 제공
+### 1) 접근성 높은 정서 지원 도구
 
-## 환경 변수
+### 2) 전문가 상담의 보조자료로 활용 가능
 
-`.env` 파일에 다음 값을 설정하세요:
+### 3) 청년 고립·우울 문제 완화
 
-```bash
-# 필수
-OPENAI_API_KEY=sk-...
-
-# 선택 (기본값 사용 가능)
-APP_NAME=FastAPI Application
-DEBUG=True
-HOST=0.0.0.0
-PORT=8000
-```
+### 4) 감정 그래프 기반 자기 이해 증진
