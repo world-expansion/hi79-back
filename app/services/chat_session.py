@@ -84,7 +84,7 @@ class ChatSessionManager:
 
         # 메시지 리스트에 추가 (RPUSH: 오른쪽에 추가)
         messages_key = f"messages:{session_id}"
-        self.redis.rpush(messages_key, json.dumps(message))
+        self.redis.rpush(messages_key, json.dumps(message, ensure_ascii=False))
 
         # 세션 메타데이터 업데이트
         self.redis.hset(session_key, "last_activity", datetime.now().isoformat())
