@@ -106,6 +106,26 @@ class ChatOrchestrator:
         self.chain_extract_cbt = self.cbt_extract_prompt | self.llm_mini | string_parser
         self.chain_gen_perspective = self.alt_perspective_prompt | self.llm_mini | string_parser
         self.chain_create_diary = self.diary_generation_prompt | self.llm_mini | string_parser
+
+        # 쿼리 리라이팅 체인 (RAG 검색 품질 향상)
+        query_rewrite_prompt_template = """당신은 검색 쿼리 최적화 전문가입니다.
+사용자의 최근 대화 맥락을 참고하여, 현재 메시지를 검색에 적합한 독립적인 쿼리로 변환하세요.
+
+[최근 대화]
+{recent_conversation}
+
+[현재 메시지]
+{current_message}
+
+[규칙]
+- 대화 맥락에서 생략된 주어, 목적어, 주제를 복원하세요
+- 검색에 불필요한 감탄사, 맞장구("네", "아", "음") 등은 제거하세요
+- 핵심 키워드와 주제를 포함한 1~2문장의 자연어 쿼리로 작성하세요
+- 원래 메시지가 이미 충분히 구체적이면 그대로 유지하세요
+
+[변환된 검색 쿼리]"""
+        self.query_rewrite_prompt = ChatPromptTemplate.from_template(query_rewrite_prompt_template)
+        self.chain_rewrite_query = self.query_rewrite_prompt | self.llm_mini | string_parser
         # --- [주석] ---
 
     # ------------------------
@@ -144,21 +164,24 @@ class ChatOrchestrator:
         # 4. 대화 요약 버퍼 로직 적용
         buffered_messages = self._apply_summary_buffer_memory(session_id, full_conversation)
 
-        # 5. 과거 일기 검색 (RAG)
+        # 5. 쿼리 리라이팅 (RAG 검색 품질 향상)
+        rewritten_query = self._rewrite_query_for_retrieval(user_message, full_conversation)
+
+        # 6. 과거 일기 검색 (RAG)
         similar_diaries = self.diary_service.search_similar_diaries(
-            user_id=user_id, query=user_message, k=3
+            user_id=user_id, query=rewritten_query, k=3
         )
 
-        # 6. PDF 매뉴얼 검색 (RAG)
+        # 7. PDF 매뉴얼 검색 (RAG)
         manual_context = None
         if self.vector_store:
             try:
-                manual_result = self.vector_store.query(user_message)
+                manual_result = self.vector_store.query(rewritten_query)
                 manual_context = manual_result.get("answer", "")
             except Exception as e:
                 print(f"매뉴얼 검색 실패: {e}")
 
-        # 7. 컨텍스트 구성 (시스템 프롬프트 + RAG + 버퍼된 대화)
+        # 8. 컨텍스트 구성 (시스템 프롬프트 + RAG + 버퍼된 대화)
         context = self._build_context_with_memory(
             similar_diaries=similar_diaries,
             buffered_messages=buffered_messages,
@@ -166,10 +189,10 @@ class ChatOrchestrator:
             manual_context=manual_context
         )
 
-        # 8. 모델 호출
+        # 9. 모델 호출
         assistant_response = self._generate_response(context)
 
-        # 9. Redis에 저장 (영속화)
+        # 10. Redis에 저장 (영속화)
         self.session_manager.add_message(session_id, "user", user_message)
         self.session_manager.add_message(session_id, "assistant", assistant_response)
 
@@ -177,6 +200,43 @@ class ChatOrchestrator:
             "answer": assistant_response,
             "similar_diaries": [d["metadata"].get("created_at") for d in similar_diaries] if similar_diaries else None
         }
+
+    def _rewrite_query_for_retrieval(
+        self,
+        user_message: str,
+        full_conversation: List[Dict]
+    ) -> str:
+        """
+        대화 맥락을 반영하여 RAG 검색용 쿼리를 리라이팅
+
+        Args:
+            user_message: 사용자 원본 메시지
+            full_conversation: 전체 대화 내역
+
+        Returns:
+            검색에 적합한 독립적 쿼리 문자열
+        """
+        if not full_conversation:
+            return user_message
+
+        # 최근 3~4턴(6~8개 메시지)만 참고
+        recent_turns = full_conversation[-8:]
+        recent_conversation = "\n".join(
+            f"{'사용자' if msg['role'] == 'user' else '상담사'}: {msg['content']}"
+            for msg in recent_turns
+        )
+
+        try:
+            rewritten = self.chain_rewrite_query.invoke({
+                "recent_conversation": recent_conversation,
+                "current_message": user_message
+            })
+            rewritten = rewritten.strip()
+            print(f"[QueryRewrite] 원본: \"{user_message}\" → 리라이팅: \"{rewritten}\"")
+            return rewritten
+        except Exception as e:
+            print(f"[QueryRewrite] 리라이팅 실패, 원본 사용: {e}")
+            return user_message
 
     def _apply_summary_buffer_memory(
         self,
